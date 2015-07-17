@@ -1,0 +1,319 @@
+/* ----------------------------------------------------------------------- *//**
+ *
+ * @file svm.sql_in
+ *
+ * @brief Implementation of SVM classification and regression
+ *
+ * @sa For a brief introduction to k-means clustering, see the module
+ *     description \ref grp_kmeans.
+ *
+ *//* ----------------------------------------------------------------------- */
+
+m4_include(`SQLCommon.m4')
+
+/**
+@addtogroup grp_svm
+
+<div class="toc"><b>Contents</b>
+<ul>
+<li class="level1"><a href="#train">Training Function</a></li>
+<li class="level1"><a href="#output">Output Format</a></li>
+<li class="level1"><a href="#notes">Notes</a></li>
+<li class="level1"><a href="#background">Technical Background</a></li>
+<li class="level1"><a href="#literature">Literature</a></li>
+<li class="level1"><a href="#related">Related Topics</a></li>
+</ul>
+</div>
+
+@brief Solves classification and regression problems by separating the data with a hyperplane or other nonlinear 
+decision boundaries.
+
+
+Support Vector Machines (SVMs) are a commonly used technique for approaching regression and classification problems. SVM models have two particularly desirable features: robustness in the presence of noisy data, and applicability to a variety of data schemes. At its core, a <em>linear</em> SVM model utilizes a hyperplane to separate input data or determine regression values. Using kernels, one can utilize the same techniques with non-linear decision boundaries.
+
+@anchor train
+@par Training Function
+GLM training function has the following format:
+<pre class="syntax">
+svm_train(source_table,
+    model_table,
+    dependent_varname,
+    independent_varname,
+    kernel_func,
+    kernel_parameters,
+    optim_params,
+    reg_parameters
+    )
+</pre>
+\b Arguments
+<DL class="arglist">
+  <DT>source_table</DT>
+  <DD>TEXT. The name of the table containing the training data.</DD>
+
+  <DT>model_table</DT>
+  <DD>TEXT. Name of the generated table containing the model.
+
+    The model table produced by glm contains the following columns:
+
+    <table class="output">
+      <tr>
+        <th>&lt;...&gt;</th>
+        <td>Text. Grouping columns, if provided in input. This could be multiple columns
+          depending on the \c grouping_col input.</td>
+      </tr>
+
+      <tr>
+        <th>coef</th>
+        <td>FLOAT8. Vector of the coefficients in linear predictor.</td>
+      </tr>
+
+      <tr>
+        <th>log_likelihood</th>
+        <td>FLOAT8. The log-likelihood \f$ l(\boldsymbol \beta) \f$. We use the maximum likelihood estimate of
+            dispersion parameter to calculate the log-likelihood while R and Python use deviance estimate and
+            Pearson estimate respectively.</td>
+      </tr>
+
+      <tr>
+        <th>std_err</th>
+        <td>FLOAT8[]. Vector of the standard error of the coefficients.</td>
+      </tr>
+
+      <tr>
+        <th>z_stats or t_stats</th>
+        <td>FLOAT8[]. Vector of the z-statistics (in Poisson distribtuion and Binomial distribution) or the t-statistics (in all other distributions) of the coefficients.</td>
+      </tr>
+
+      <tr>
+        <th>p_values</th>
+        <td>FLOAT8[]. Vector of the p-values of the coefficients.</td>
+      </tr>
+
+      <tr>
+        <th>dispersion</th>
+        <td>FLOAT8. The dispersion value (Pearson estimate). When family=poisson or family=binomial, the dispersion is
+        always 1.</td>
+      </tr>
+
+      <tr>
+        <th>num_rows_processed</th>
+        <td>BIGINT. Numbers of rows processed.</td>
+      </tr>
+
+      <tr>
+        <th>num_rows_skipped</th>
+        <td>BIGINT. Numbers of rows skipped due to missing values or failures.</td>
+      </tr>
+
+      <tr>
+        <th>num_iterations</th>
+        <td>INTEGER. The number of iterations actually completed. This would be different
+          from the \c nIterations argument if a \c tolerance parameter is provided and the
+          algorithm converges before all iterations are completed.</td>
+      </tr>
+    </table>
+
+    A summary table named \<model_table\>_summary is also created at the same time, which has the following columns:
+     <table class="output">
+
+    <tr>
+    <th>method</th>
+    <td>'glm'</td>
+    </tr>
+
+    <tr>
+    <th>source_table</th>
+    <td>The data source table name.</td>
+    </tr>
+
+    <tr>
+    <th>model_table</th>
+    <td>The model table name.</td>
+    </tr>
+
+    <tr>
+    <th>dependent_varname</th>
+    <td>The dependent variable.</td>
+    </tr>
+
+    <tr>
+    <th>independent_varname</th>
+    <td>The independent variables</td>
+    </tr>
+
+    <tr>
+    <th>family_params</th>
+    <td>A string that contains family parameters, and has the form of 'family=..., link=...'</td>
+    </tr>
+
+    <tr>
+    <th>grouping_col</th>
+    <td>Name of grouping columns.</td>
+    </tr>
+
+    <tr>
+    <th>optimizer_params</th>
+    <td>A string that contains optimizer parameters, and has the form of 'optimizer=..., max_iter=..., tolerance=...'</td>
+    </tr>
+
+    <tr>
+    <th>num_all_groups</th>
+    <td>Number of groups in glm training.</td>
+    </tr>
+
+    <tr>
+    <th>num_failed_groups</th>
+    <td>Number of failed groups in glm training.</td>
+    </tr>
+
+    <tr>
+      <th>total_rows_processed</th>
+      <td>BIGINT. Total numbers of rows processed in all groups.</td>
+    </tr>
+
+    <tr>
+      <th>total_rows_skipped</th>
+      <td>BIGINT. Total numbers of rows skipped in all groups due to missing values or failures.</td>
+    </tr>
+
+   </table>
+  </DD>
+
+  <DT>dependent_varname</DT>
+  <DD>TEXT. Name of the dependent variable column.</DD>
+
+  <DT>independent_varname</DT>
+  <DD>TEXT. Expression list to evaluate for the
+    independent variables. An intercept variable is not assumed. It is common to
+    provide an explicit intercept term by including a single constant \c 1 term in
+    the independent variable list.</DD>
+
+  <DT>family_params (optional)</DT>
+  <DD>TEXT, Parameters for distribution family. Currently, we
+    support
+
+    (1) family=poisson and link=[log or identity or sqrt].
+
+    (2) family=gaussian and link=[identity or log or inverse].
+    And when family=gaussian and link=identity, the GLM model is
+    exactly the same as the linear regression.
+
+    (3) family=gamma and link=[inverse or identity or log].
+
+    (4) family=inverse_gaussian and link=[sqr_inverse or log or identity or inverse].
+
+    (5) family=binomial and link=[probit or logit].
+    </DD>
+
+  <DT>grouping_col (optional)</DT>
+  <DD>TEXT, default: NULL. An expression list used to group
+    the input dataset into discrete groups, running one regression per group.
+    Similar to the SQL "GROUP BY" clause. When this value is NULL, no
+    grouping is used and a single model is generated.</DD>
+
+  <DT>optim_params (optional)</DT>
+  <DD>TEXT, default: 'max_iter=100,optimizer=irls,tolerance=1e-6'.
+    Parameters for optimizer. Currently, we support
+    tolerance=[tolerance for relative error between log-likelihoods],
+    max_iter=[maximum iterations to run], optimizer=irls.</DD>
+
+  <DT>verbose (optional)</DT>
+  <DD>BOOLEAN, default: FALSE. Provides verbose output of the results of training.</DD>
+</DL>
+
+<dd>@note For p-values, we just return the computation result directly.
+Other statistical packages, like 'R', produce the same result, but on printing the
+result to screen, another format function is used and any p-value that is
+smaller than the machine epsilon (the smallest positive floating-point number
+'x' such that '1 + x != 1') will be printed on screen as "< xxx" (xxx is the
+value of the machine epsilon). Although the results may look different, they are
+in fact the same.
+</dd>
+
+@anchor predict
+@par Prediction Function
+The prediction function is provided to estimate the conditional mean given a new
+predictor. It has the following syntax:
+<pre class="syntax">
+glm_predict(coef,
+            col_ind_var
+            link)
+</pre>
+
+\b Arguments
+<DL class="arglist">
+  <DT>coef</DT>
+  <DD>DOUBLE PRECISION[]. Model coefficients obtained from \ref glm().</DD>
+
+  <DT>col_ind_var</DT>
+  <DD>New predictor, as a DOUBLE array. This should be the same length
+  as the array obtained by evaluation of the 'independent_varname' argument in
+  \ref glm().</DD>
+
+  <DT>link</DT>
+  <DD>link function, as a string. This should match the link function the user
+  inputted in \ref glm().</DD>
+</DL>
+
+
+
+
+
+@anchor background
+@par Technical Background
+
+The following is the objective function to be minimized:
+
+\f[
+    \underset{w}{\text{Minimize }} \frac{1}{2}||w||^2 + \frac{C}{n}\sum_{i=1}^n \ell(y_i,f(x_i))
+
+\f]
+ 
+ where \f$\ell(y,f(x)) = \max(0,1-yf(x))\f$ is the <emph>hinge loss</emph>.
+
+There are many algorithms for learning kernel machines. This module implements the class of online learning with kernels algorithms described in Kivinen et al. It also includes the incremental gradient descent (IGD) method Feng et al. for learning linear SVMs with the hinge loss  \f$ \ell(y,z) = \max(0,1-yz)\$. See also the book Scholkopf and Smola  for more details of SVMs in general.
+
+
+@anchor literature
+@literature
+
+@anchor kmeans-lit-1
+[1] Wikipedia, K-means Clustering,
+    http://en.wikipedia.org/wiki/K-means_clustering
+
+@anchor kmeans-lit-2
+[2] David Arthur, Sergei Vassilvitskii: k-means++: the advantages of careful
+    seeding, Proceedings of the 18th Annual ACM-SIAM Symposium on Discrete
+    Algorithms (SODA'07), pp. 1027-1035,
+    http://www.stanford.edu/~darthur/kMeansPlusPlus.pdf
+
+@anchor kmeans-lit-3
+[3] E. R. Hruschka, L. N. C. Silva, R. J. G. B. Campello: Clustering
+    Gene-Expression Data: A Hybrid Approach that Iterates Between k-Means and
+    Evolutionary Search. In: Studies in Computational Intelligence - Hybrid
+    Evolutionary Algorithms. pp. 313-335. Springer. 2007.
+
+@anchor kmeans-lit-4
+[4] Lloyd, Stuart: Least squares quantization in PCM. Technical Note, Bell
+    Laboratories. Published much later in: IEEE Transactions on Information
+    Theory 28(2), pp. 128-137. 1982.
+
+@anchor kmeans-lit-5
+[5] Leisch, Friedrich: A Toolbox for K-Centroids Cluster Analysis.  In: Computational
+    Statistics and Data Analysis, 51(2). pp. 526-544. 2006.
+
+
+@anchor related
+@par Related Topics
+
+File kmeans.sql_in documenting the k-Means SQL functions
+
+\ref grp_svec
+
+\ref simple_silhouette()
+
+
+@internal
+@sa namespace kmeans (documenting the implementation in Python)
+@endinternal
+*/
