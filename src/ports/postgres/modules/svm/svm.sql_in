@@ -83,6 +83,69 @@ svm_train(source_table,
       </tr>
 
 	</table>
+	
+	A summary table named \<model_table\>_summary is also created at the same time, which has the following columns:
+    <table class="output">
+
+    <tr>
+    <th>method</th>
+    <td>'svm'</td>
+    </tr>
+
+    <tr>
+    <th>source_table</th>
+    <td>The data source table name.</td>
+    </tr>
+
+    <tr>
+    <th>model_table</th>
+    <td>The model table name.</td>
+    </tr>
+
+    <tr>
+    <th>dependent_varname</th>
+    <td>The dependent variable.</td>
+    </tr>
+
+    <tr>
+    <th>independent_varname</th>
+    <td>The independent variables</td>
+    </tr>
+
+    <tr>
+    <th>kernel_func</th>
+    <td>The kernel function</td>
+    </tr>
+
+    <tr>
+    <th>kernel_parameters</th>
+    <td>The kernel parameters, as well as random feature map data</td>
+    </tr>
+
+    <tr>
+    <th>optim_params</th>
+    <td>A string containing the optimization parameters</td>
+    </tr>
+
+    <tr>
+    <th>reg_params</th>
+    <td>A string containing the regularization parameters</td>
+    </tr>
+
+	<tr>
+      <th>num_rows_processed</th>
+      <td>BIGINT. Total numbers of rows processed in all groups.</td>
+    </tr>
+
+    <tr>
+      <th>num_rows_skipped</th>
+      <td>BIGINT. Total numbers of rows skipped in all groups due to missing values or failures.</td>
+    </tr>
+
+   </table>
+
+
+
   </DD>
 
   <DT>dependent_varname</DT>
