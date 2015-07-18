@@ -35,6 +35,7 @@ svm_train(source_table,
     independent_varname,
     kernel_func,
     kernel_params,
+    grouping_col,
     optim_params,
     reg_params
     verbose
@@ -58,23 +59,18 @@ svm_train(source_table,
       </tr>
 
       <tr>
-        <th>bias</th>
-        <td>FLOAT8. The bias term.</td>
+    	<th>grouping_col</th>
+    	<td>Name of grouping columns.</td>
       </tr>
 
       <tr>
-        <th>nSV</th>
-        <td>INTEGER. Number of support vectors.</td>
+        <th>num_rows_processed</th>
+        <td>BIGINT. Numbers of rows processed.</td>
       </tr>
 
       <tr>
-        <th>kernel_func</th>
-        <td>TEXT. Type of kernel being modeled.</td>
-      </tr>
-
-      <tr>
-        <th>kernel_parameters</th>
-        <td>TEXT. Parameters of the kernel function. In case of non-linear kernel, also include random feature map data.</td>
+        <th>num_rows_skipped</th>
+        <td>BIGINT. Numbers of rows skipped due to missing values or failures.</td>
       </tr>
 
 	  <tr>
@@ -133,12 +129,22 @@ svm_train(source_table,
     </tr>
 
 	<tr>
-      <th>num_rows_processed</th>
+    <th>num_all_groups</th>
+    <td>Number of groups in glm training.</td>
+    </tr>
+
+    <tr>
+    <th>num_failed_groups</th>
+    <td>Number of failed groups in glm training.</td>
+    </tr>
+
+    <tr>
+      <th>total_rows_processed</th>
       <td>BIGINT. Total numbers of rows processed in all groups.</td>
     </tr>
 
     <tr>
-      <th>num_rows_skipped</th>
+      <th>total_rows_skipped</th>
       <td>BIGINT. Total numbers of rows skipped in all groups due to missing values or failures.</td>
     </tr>
 
@@ -155,23 +161,29 @@ svm_train(source_table,
   <DD>TEXT. Expression list to evaluate for the
     independent variables. An intercept variable is not assumed. It is common to
     provide an explicit intercept term by including a single constant \c 1 term in
-    the independent variable list.</DD>
+    the independent variable list. Expression should be able to be casted into DOUBLE PRECISION [].</DD>
 
-  <DT>kernel_func</DT>
+  <DT>kernel_func (optional)</DT>
   <DD>TEXT, default: 'linear'
-    The type of kernel. Currently, three types are supported: linear, RBF, and Polynomial.</DD>
+    The type of kernel. Currently, three types are supported: 'linear', 'gaussian', and 'polynomial'.</DD>
 
-  <DT>kernel_params</DT>
-  <DD>TEXT, default: NULL
-   Parameters for non-linear kernel. If RBF, one parameter, \f$\gamma\f$, is expected. If polynomial, two parameters are expected:
-    a coefficient \f$q\f$ and degree \f$d\f$, i.e. \f$ (\langle x,y\rangle + q)^d \f$.</DD>
+  <DT>kernel_params (optional)</DT>
+  <DD>TEXT, default: NULL if 'linear' kernel, gamma=\f$\frac{1}{#features}\f$ if 'gaussian', q=0,d=3 if 'polynomial'
+   Parameters for non-linear kernel. If gaussian, one parameter, \f$\gamma\f$, is expected. If polynomial, two parameters are expected:
+    a coefficient \f$q\f$ and degree \f$d\f$, i.e. \f$ (\langle x,y\rangle + q)^d \f$. </DD>
 
-  <DT>optim_params</DT>
-  <DD>TEXT, default: ''
+  <DT>grouping_col (optional)</DT>
+  <DD>TEXT, default: NULL. An expression list used to group
+    the input dataset into discrete groups, running one regression per group.
+    Similar to the SQL "GROUP BY" clause. When this value is NULL, no
+    grouping is used and a single model is generated.</DD>
+
+  <DT>optim_params (optional)</DT>
+  <DD>TEXT, default: 'stepsize=0.01, max_iters=100'.
     Optimization paramters, such as stepsize, max number of iterations, etc.</DD>
 
-  <DT>reg_params</DT>
-  <DD>TEXT, default: 'linear'
+  <DT>reg_params (optional)</DT>
+  <DD>TEXT, default: 'lambda=0.01'
     Regularization parameters, such as \f$\lambda\f$.</DD>
 
 </DL>
@@ -194,6 +206,9 @@ svm_predict(model_table,
 
   <DT>new_data_table</DT>
   <DD>TEXT. Name of the table containing prediction data. This table is expected to contain the same features that were used during training. The table should also contain id_col_name used for identifying each row.</DD>
+
+  <DT>id_col_name</DT>
+  <DD></DD>
 
   <DT>output_table</DT>
   <DD>TEXT. Name of the table to output prediction results to. If this table already exists then an error is returned. The table contains the id_col_name column giving the 'id' for each prediction and the prediction columns for the dependent variable.</DD>
