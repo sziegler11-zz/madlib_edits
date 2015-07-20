@@ -37,7 +37,7 @@ svm_train(source_table,
     kernel_params,
     grouping_col,
     optim_params,
-    lambda,
+    reg_params,
     verbose
     )
 </pre>
@@ -59,6 +59,11 @@ svm_train(source_table,
       </tr>
 
       <tr>
+        <th>random_feature_data</th>
+        <td>BYTEA8. Data needed to embed test data into random feature space. NULL if the kernel is linear.</td>
+      </tr>
+
+	  <tr>
     	<th>grouping_col</th>
     	<td>Name of grouping columns.</td>
       </tr>
@@ -187,12 +192,13 @@ svm_train(source_table,
     grouping is used and a single model is generated.</DD>
 
   <DT>optim_params (optional)</DT>
-  <DD>TEXT, default: 'stepsize=0.01, max_iters=100'.
+  <DD>TEXT, default: 'init_stepsize=0.01, decay_factor=0.9 max_iters=100'.
     Optimization paramters, such as stepsize, max number of iterations, etc.</DD>
 
-  <DT>lambda (optional)</DT>
-  <DD>TEXT, default: 'lambda=0.01'.
-    Regularization parameter.</DD>
+  <DT>reg_params (optional)</DT>
+  <DD>TEXT, default: 'lambda=0.01, n_folds=0, param_explored'.
+    Regularization parameters. If the user specifies n_folds >0, then cross-validation with n_folds will be performed to find the
+    optimum values of 'param_explored'. n_folds should be > 2, if positive.</DD>
 
   <DT>verbose (optional)</DT>
   <DD>BOOLEAN default: FALSE.
@@ -221,7 +227,7 @@ svm_predict(model_table,
   <DD>TEXT. Name of the table containing prediction data. This table is expected to contain the same features that were used during training. The table should also contain id_col_name used for identifying each row.</DD>
 
   <DT>id_col_name</DT>
-  <DD>TEXT. The name of the column in the input table.</DD>
+  <DD>TEXT. The name of the id column in the input table.</DD>
 
   <DT>output_table</DT>
   <DD>TEXT. Name of the table to output prediction results to. If this table already exists then an error is returned. The table contains the id_col_name column giving the 'id' for each prediction and the prediction columns for the dependent variable.</DD>
@@ -236,34 +242,40 @@ svm_predict(model_table,
 To solve linear SVM, the following objective function is minimized:
 
 \f[
-    \underset{w,b}{\text{Minimize }} \frac{1}{2}||w||^2 + \frac{C}{n}\sum_{i=1}^n \ell(y_i,f_{w,b}(x_i))
+    \underset{w,b}{\text{Minimize }} \lambda||w||^2 + \frac{1}{n}\sum_{i=1}^n \ell(y_i,f_{w,b}(x_i))
 
 \f]
  
- where \f$(x_1,y_1),\ldots,(x_n,y_n)\f$ are labeled training data and \f$\ell(y,f(x)) = \max(0,1-yf(x))\f$ is the <em>hinge loss</em>. If \f$ f_{w,b}(x) = \langle w, x\rangle + b\f$, for example, then the objective function is convex and incremental gradient descent (IGD, or SGD) can be applied to find a global minimum.
+ where \f$(x_1,y_1),\ldots,(x_n,y_n)\f$ are labeled training data and \f$\ell(y,f(x)) = \max(0,1-yf(x))\f$ is the <em>hinge loss</em>. If \f$ f_{w,b}(x) = \langle w, x\rangle + b\f$, for example, then the objective function is convex and incremental gradient descent (IGD, or SGD) can be applied to find a global minimum. Consult Feng, et al. [1] for more details.
 
 
 
-To learn with RBF or polynomial kernels, the training data is first mapped via a <em>random feature map</em> in such a way that the usual inner product in the range space approximates the kernel function in the original feature space. The linear SVM training function is then run on the resulting data. See the papers [1,2] for more information on random feature maps.
+To learn with Gaussian or polynomial kernels, the training data is first mapped via a <em>random feature map</em> in such a way that the usual inner product in the range space approximates the kernel function in the original feature space. The linear SVM training function is then run on the resulting data. See the papers [2,3] for more information on random feature maps.
 
-Also, see the book [3] by Scholkopf and Smola  for more details of SVMs in general.
+Also, see the book [4] by Scholkopf and Smola  for more details of SVMs in general.
 
 @anchor literature
 @literature
 
 @anchor svm-lit-1
-[1] Purushottam Kar and Harish Karnick: Random Feature Maps for Dot
+[1] Xixuan Feng, Arun Kumar, Ben Recht, and Christopher Re:
+	Towards a Unified Architecture for in-RDBMS analytics,
+	in SIGMOD Conference, 2012
+	http://www.eecs.berkeley.edu/~brecht/papers/12.FengEtAl.SIGMOD.pdf
+
+@anchor svm-lit-2
+[2] Purushottam Kar and Harish Karnick: Random Feature Maps for Dot
 	Product Kernels, Proceedings of the 15th International Conference
 	on Artificial Intelligence and Statistics, 2012,
 	http://machinelearning.wustl.edu/mlpapers/paper_files/AISTATS2012_KarK12.pdf
 
-@anchor svm-lit-2
-[2] Ali Rahmini and Ben Recht: Random Features for Large-Scale 
+@anchor svm-lit-3
+[3] Ali Rahmini and Ben Recht: Random Features for Large-Scale 
 Kernel Machines, Neural Information Processing Systems 2007,
 	http://www.eecs.berkeley.edu/~brecht/papers/07.rah.rec.nips.pdf
 
-@anchor svm-lit-3
-[3] Bernhard Scholkopf and Alexander Smola: Learning with Kernels,
+@anchor svm-lit-4
+[4] Bernhard Scholkopf and Alexander Smola: Learning with Kernels,
 	The MIT Press, Cambridge, MA, 2002.
 
    
