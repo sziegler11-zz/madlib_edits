@@ -68,7 +68,7 @@ CREATE AGGREGATE MADLIB_SCHEMA.linear_svm_igd_step_serial(
     STYPE=double precision[],
     SFUNC=MADLIB_SCHEMA.linear_svm_igd_transition,
     FINALFUNC=MADLIB_SCHEMA.linear_svm_igd_final,
-    INITCOND='{0,0,0,0,0}'
+    INITCOND='{0,0,0,0,0,0,0}'
 );
 
 
@@ -96,7 +96,7 @@ CREATE AGGREGATE MADLIB_SCHEMA.linear_svm_igd_step(
     SFUNC=MADLIB_SCHEMA.linear_svm_igd_transition,
     m4_ifdef(`__POSTGRESQL__', `', `prefunc=MADLIB_SCHEMA.linear_svm_igd_merge,')
     FINALFUNC=MADLIB_SCHEMA.linear_svm_igd_final,
-    INITCOND='{0,0,0,0,0}'
+    INITCOND='{0,0,0,0,0,0,0}'
 );
 
 CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.internal_linear_svm_igd_distance(
@@ -138,6 +138,26 @@ CREATE TYPE MADLIB_SCHEMA.lsvm_sgd_result AS (
 );
 
 
+
+
+CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.lsvm_classification(
+    input_table text,
+    model_table text,
+    parallel bool,
+    verbose bool,
+    eta float8,
+    reg float8,
+    max_iter int,
+    decay_factor float8,
+    is_l2 bool)
+RETURNS SETOF MADLIB_SCHEMA.lsvm_sgd_result AS $$
+PythonFunction(kernel_machines, lsvm, lsvm_classification)
+$$ LANGUAGE plpythonu VOLATILE
+m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
+
+
+
+
 /**
  * @brief This is the linear support vector classification function
  *
@@ -161,8 +181,8 @@ CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.lsvm_classification(
     max_iter int,
     decay_factor float8)
 RETURNS SETOF MADLIB_SCHEMA.lsvm_sgd_result AS $$
-PythonFunction(kernel_machines, lsvm, lsvm_classification)
-$$ LANGUAGE plpythonu VOLATILE
+    SELECT MADLIB_SCHEMA.lsvm_classification($1, $2, $3, $4, $5, $6, $7, $8, FALSE);
+$$ LANGUAGE sql VOLATILE
 m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
 
 
