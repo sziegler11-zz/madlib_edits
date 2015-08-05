@@ -26,19 +26,17 @@ namespace modules {
 namespace convex {
 
 // This 2 classes contain public static methods that can be called
-typedef IGD<RegularizedGLMIGDState<MutableArrayHandle<double> >,
-        RegularizedGLMIGDState<ArrayHandle<double> >,
+typedef IGD<GLMIGDState<MutableArrayHandle<double> >,
+        GLMIGDState<ArrayHandle<double> >,
         LinearSVM<GLMModel, GLMTuple > > LinearSVMIGDAlgorithm;
 
-typedef Loss<RegularizedGLMIGDState<MutableArrayHandle<double> >,
-        RegularizedGLMIGDState<ArrayHandle<double> >,
+typedef Loss<GLMIGDState<MutableArrayHandle<double> >,
+        GLMIGDState<ArrayHandle<double> >,
         LinearSVM<GLMModel, GLMTuple > > LinearSVMLossAlgorithm;
 
-typedef Gradient<RegularizedGLMIGDState<MutableArrayHandle<double> >,
-        RegularizedGLMIGDState<ArrayHandle<double> >,
+typedef Gradient<GLMIGDState<MutableArrayHandle<double> >,
+        GLMIGDState<ArrayHandle<double> >,
         LinearSVM<GLMModel, GLMTuple > > LinearSVMGradientAlgorithm;
-
-
 
 /**
  * @brief Perform the linear support vector machine transition step
@@ -51,12 +49,12 @@ linear_svm_igd_transition::run(AnyType &args) {
     // For the first tuple: args[0] is nothing more than a marker that
     // indicates that we should do some initial operations.
     // For other tuples: args[0] holds the computation state until last tuple
-    RegularizedGLMIGDState<MutableArrayHandle<double> > state = args[0];
+    GLMIGDState<MutableArrayHandle<double> > state = args[0];
 
     // initilize the state if first tuple
     if (state.algo.numRows == 0) {
         if (!args[3].isNull()) {
-            RegularizedGLMIGDState<ArrayHandle<double> > previousState = args[3];
+            GLMIGDState<ArrayHandle<double> > previousState = args[3];
             state.allocate(*this, previousState.task.dimension);
             state = previousState;
         } else {
@@ -86,18 +84,10 @@ linear_svm_igd_transition::run(AnyType &args) {
     tuple.depVar = args[2].getAs<bool>() ? 1. : -1.;
 
     // Now do the transition step
+    // apply IGD with regularization
     LinearSVMIGDAlgorithm::transition(state, tuple);
-    // regularization, it can be added thru convex framework
-    double reg = args[6].getAs<double>();
-    if (reg > 0.) {
-        for (int i = 0; i < state.algo.incrModel.size(); i ++) {
-            if (state.algo.incrModel(i) > reg) {
-                state.algo.incrModel(i) -= reg;
-            } else if (state.algo.incrModel(i) < -reg) {
-                state.algo.incrModel(i) += reg;
-            } else { state.algo.incrModel(i) = 0.; }
-        }
-    }
+    // L1NormIGDAlgorithm::transition(state, reg)
+    // objective function and its gradient
     LinearSVMLossAlgorithm::transition(state, tuple);
     LinearSVMGradientAlgorithm::transition(state, tuple);
 
@@ -111,8 +101,8 @@ linear_svm_igd_transition::run(AnyType &args) {
  */
 AnyType
 linear_svm_igd_merge::run(AnyType &args) {
-    RegularizedGLMIGDState<MutableArrayHandle<double> > stateLeft = args[0];
-    RegularizedGLMIGDState<ArrayHandle<double> > stateRight = args[1];
+    GLMIGDState<MutableArrayHandle<double> > stateLeft = args[0];
+    GLMIGDState<ArrayHandle<double> > stateRight = args[1];
 
     // We first handle the trivial case where this function is called with one
     // of the states being the initial state
@@ -138,7 +128,7 @@ AnyType
 linear_svm_igd_final::run(AnyType &args) {
     // We request a mutable object. Depending on the backend, this might perform
     // a deep copy.
-    RegularizedGLMIGDState<MutableArrayHandle<double> > state = args[0];
+    GLMIGDState<MutableArrayHandle<double> > state = args[0];
 
     // Aggregates that haven't seen any data just return Null.
     if (state.algo.numRows == 0) { return Null(); }
@@ -154,8 +144,8 @@ linear_svm_igd_final::run(AnyType &args) {
  */
 AnyType
 internal_linear_svm_igd_distance::run(AnyType &args) {
-    RegularizedGLMIGDState<ArrayHandle<double> > stateLeft = args[0];
-    RegularizedGLMIGDState<ArrayHandle<double> > stateRight = args[1];
+    GLMIGDState<ArrayHandle<double> > stateLeft = args[0];
+    GLMIGDState<ArrayHandle<double> > stateRight = args[1];
 
     return std::abs((stateLeft.algo.loss - stateRight.algo.loss)
             / stateRight.algo.loss);
@@ -166,7 +156,7 @@ internal_linear_svm_igd_distance::run(AnyType &args) {
  */
 AnyType
 internal_linear_svm_igd_result::run(AnyType &args) {
-    RegularizedGLMIGDState<ArrayHandle<double> > state = args[0];
+    GLMIGDState<ArrayHandle<double> > state = args[0];
 
     AnyType tuple;
     tuple << state.task.model
