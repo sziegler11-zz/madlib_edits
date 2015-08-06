@@ -11,6 +11,7 @@
 #include "linear_svm_igd.hpp"
 
 #include "task/linear_svm.hpp"
+#include "task/l1.hpp"
 #include "algo/igd.hpp"
 #include "algo/loss.hpp"
 #include "algo/gradient.hpp"
@@ -83,10 +84,12 @@ linear_svm_igd_transition::run(AnyType &args) {
             state.task.dimension);
     tuple.depVar = args[2].getAs<bool>() ? 1. : -1.;
 
+    double reg = args[6].getAs<double>();
+
     // Now do the transition step
     // apply IGD with regularization
     LinearSVMIGDAlgorithm::transition(state, tuple);
-    // L1NormIGDAlgorithm::transition(state, reg)
+    L1<GLMModel>::clipping(state.algo.incrModel, reg, state.task.stepsize);
     // objective function and its gradient
     LinearSVMLossAlgorithm::transition(state, tuple);
     LinearSVMGradientAlgorithm::transition(state, tuple);
