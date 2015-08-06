@@ -61,7 +61,8 @@ def __lsvm_train(schema_madlib, rel_args, rel_state, rel_source,
                         {dimension}::INT4,
                         {stepsize}::FLOAT8, -- it.kwargs['stepsize']
                         {reg}::FLOAT8,
-                        {is_l2}::BOOLEAN)
+                        {is_l2}::BOOLEAN,
+                        {inds}::INTEGER)
                 FROM {rel_source} AS _src
                 """)
             if it.test("""
@@ -89,7 +90,7 @@ def lsvm_classification(schema_madlib, input_table, model_table, parallel,
     @param parallel A flag indicating whether the system should learn multiple models in parallel
     @param verbose Verbosity of reporting
     @param eta Initial learning rate in (0,1] (default value is 0.1)
-    @param reg Regularization parameter, often chosen by cross-validation (default value is 0.001)
+    @param lambda Regularization parameter, often chosen by cross-validation (default value is 0.001)
     @param max_iter Maximum iterations to run, a positive integer (default value is 100)
     """
     # parameter validation
@@ -139,19 +140,8 @@ def lsvm_classification(schema_madlib, input_table, model_table, parallel,
             'col_dep_var': 'label'} # hard-coded name
     args.update(locals())
 
-    # temp table for iterating
-    plpy.execute("SELECT {schema_madlib}.create_schema_pg_temp()".format(**args))
-    plpy.execute("""
-            DROP TABLE IF EXISTS pg_temp.{rel_args};
-            CREATE TABLE pg_temp.{rel_args} AS
-            SELECT
-                {ind_dim}   AS dimension,
-                {eta}       AS stepsize,
-                {reg}       AS reg,
-                {max_iter}  AS num_iterations,
-                0           AS tolerance;
-            """.format(**args))
-
+    # place holder for compatibility
+    plpy.execute("CREATE TABLE pg_temp.{rel_args} AS SELECT 1".format(**args))
     # actual iterative algorithm computation
     iteration_run = __lsvm_train(**args)
 

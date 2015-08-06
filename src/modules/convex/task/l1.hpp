@@ -26,6 +26,7 @@ public:
     static void clipping(
             model_type                          &incrModel,
             const double                        &lambda, 
+            const int                           &n_tuples,
             const double                        &stepsize);
 
     static double loss(
@@ -38,13 +39,15 @@ void
 L1<Model>::clipping(
         model_type                          &incrModel,
         const double                        &lambda, 
+        const int                           &n_tuples,
         const double                        &stepsize) {
     // implement the Clipping method mentioned in Tsuruoka et al. 2009
+    double clip_boundry = lambda / n_tuples * stepsize;
     for (Index i = 0; i < incrModel.size(); i++) {
-        if (incrModel(i) > lambda * stepsize) {
-            incrModel(i) -= lambda * stepsize;
-        } else if (incrModel(i) < - lambda * stepsize) {
-            incrModel(i) += lambda * stepsize;
+        if (incrModel(i) > clip_boundry) {
+            incrModel(i) -= clip_boundry;
+        } else if (incrModel(i) < - clip_boundry) {
+            incrModel(i) += clip_boundry;
         } else { incrModel(i) = 0.; }
     }
 }

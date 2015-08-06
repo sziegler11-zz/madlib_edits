@@ -29,9 +29,10 @@ public:
             const double                        &lambda,
             model_type                          &gradient);
 
-    static void gradientInPlace(
+    static void scaling(
             model_type                          &incrModel,
-            const double                        &lambda, 
+            const double                        &lambda,
+            const int                           &n_tuples,
             const double                        &stepsize);
 
     static void hessian(
@@ -57,13 +58,14 @@ L2<Model, Hessian>::gradient(
 
 template <class Model, class Hessian>
 void
-L2<Model, Hessian>::gradientInPlace(
+L2<Model, Hessian>::scaling(
         model_type                          &incrModel,
-        const double                        &lambda, 
+        const double                        &lambda,
+        const int                           &n_tuples,
         const double                        &stepsize) {
-    if (1 - 2 * lambda * stepsize > 0) {
-        incrModel *= 1 - 2 * lambda * stepsize;
-    } else { incrModel.setZero(); }
+    double wscale = 1 - 2 * lambda / n_tuples * stepsize;
+    if (wscale > 0) { incrModel *= wscale; }
+    else { incrModel.setZero(); }
 }
 
 template <class Model, class Hessian>
