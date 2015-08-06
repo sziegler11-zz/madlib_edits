@@ -86,12 +86,16 @@ linear_svm_igd_transition::run(AnyType &args) {
     tuple.depVar = args[2].getAs<bool>() ? 1. : -1.;
 
     double reg = args[6].getAs<double>();
+    bool is_l2 = args[7].getAs<bool>();
 
     // Now do the transition step
     // apply IGD with regularization
     LinearSVMIGDAlgorithm::transition(state, tuple);
-    L1<GLMModel>::clipping(state.algo.incrModel, reg, state.task.stepsize);
-    L2<GLMModel>::gradientInPlace(state.algo.incrModel, 0., state.task.stepsize);
+    if (is_l2) {
+        L2<GLMModel>::gradientInPlace(state.algo.incrModel, reg, state.task.stepsize);
+    } else {
+        L1<GLMModel>::clipping(state.algo.incrModel, reg, state.task.stepsize);
+    }
     // objective function and its gradient
     LinearSVMLossAlgorithm::transition(state, tuple);
     LinearSVMGradientAlgorithm::transition(state, tuple);
