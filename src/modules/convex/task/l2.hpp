@@ -61,7 +61,9 @@ L2<Model, Hessian>::gradientInPlace(
         model_type                          &incrModel,
         const double                        &lambda, 
         const double                        &stepsize) {
-    incrModel *= 1 - 2 * lambda * stepsize;
+    if (1 - 2 * lambda * stepsize > 0) {
+        incrModel *= 1 - 2 * lambda * stepsize;
+    } else { incrModel.setZero(); }
 }
 
 template <class Model, class Hessian>
