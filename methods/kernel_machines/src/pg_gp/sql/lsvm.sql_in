@@ -1,7 +1,51 @@
 /* -----------------------------------------------------------------------------
  * Test Linear Support Vector Machine
  * -------------------------------------------------------------------------- */
+CREATE OR REPLACE FUNCTION __svm_target_cl_func(ind float8[])
+RETURNS float8 AS $$
+BEGIN
+    IF (ind[1] > 0 AND ind[2] < 0) THEN RETURN 1; END IF;
+    RETURN -1;
+END
+$$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION __svm_random_ind(d INT)
+RETURNS float8[] AS $$
+DECLARE
+    ret float8[];
+BEGIN
+    FOR i IN 1..(d-1) LOOP
+        ret[i] = RANDOM() * 40 - 20;
+    END LOOP;
+    IF (RANDOM() > 0.5) THEN
+        ret[d] = 10;
+    ELSE
+        ret[d] = -10;
+    END IF;
+    RETURN ret;
+END
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION svm_generate_cls_data(
+    output_table text, num int, dim int)
+RETURNS VOID AS $$
+DECLARE
+    temp_table text;
+BEGIN
+    temp_table := 'madlib_temp_' || output_table;
+    EXECUTE '
+        CREATE TABLE ' || temp_table || ' AS
+            SELECT
+                subq.val AS id,
+                __svm_random_ind(' || dim || ') AS ind
+            FROM
+                (SELECT generate_series(1, ' || num || ') AS val) subq';
+    EXECUTE '
+        CREATE TABLE ' || output_table || ' AS
+            SELECT id, ind, __svm_target_cl_func(ind) AS label
+            FROM ' || temp_table;
+END
+$$ LANGUAGE plpgsql;
 SELECT svm_generate_cls_data('svm_train_data', 1000, 4);
 SELECT svm_generate_cls_data('svm_test_data', 1000, 4);
 
