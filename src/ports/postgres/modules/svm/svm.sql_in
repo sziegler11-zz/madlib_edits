@@ -3,11 +3,11 @@
  *
  * @file svm.sql_in
  *
- * @brief SQL functions for GLM (Poisson)
+ * @brief SQL functions for SVM (Poisson)
  * @date July 2015
  *
- * @sa For a brief introduction to GLM (Poisson), see the
- *     module description \ref grp_poisson.
+ * @sa For a brief introduction to SVM (Poisson), see the
+ *     module description \ref grp_svm.
  *
  */
 /* ----------------------------------------------------------------------- */
@@ -369,3 +369,107 @@ File svm.sql_in documenting the training function
     \ref madlib::modules::regress documenting the implementation in C++
 @endinternal
 */
+
+-----------------
+
+
+CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.svm_classification(
+    source_table text,
+    model_table text,
+    dependent_varname text,
+    independent_varname text,
+    kernel_func text,
+    kernel_params text,
+    grouping_col text,
+    optim_params text,
+    reg_params text,
+    verbose bool)
+RETURNS void AS $$
+PythonFunction(svm, svm, svm_classification)
+$$ LANGUAGE plpythonu VOLATILE
+m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
+
+-- all default value handling implemented in Python
+CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.svm_classification(
+    source_table text,
+    model_table text,
+    dependent_varname text,
+    independent_varname text,
+    kernel_func text,
+    kernel_params text,
+    grouping_col text,
+    optim_params text,
+    reg_params text)
+RETURNS void AS $$
+    SELECT MADLIB_SCHEMA.svm_classification($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL);
+$$ LANGUAGE sql VOLATILE
+m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
+
+
+
+CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.svm_classification(
+    source_table text,
+    model_table text,
+    dependent_varname text,
+    independent_varname text,
+    kernel_func text,
+    kernel_params text,
+    grouping_col text,
+    optim_params text)
+RETURNS void AS $$
+    SELECT MADLIB_SCHEMA.svm_classification($1, $2, $3, $4, $5, $6, $7, $8, NULL);
+$$ LANGUAGE sql VOLATILE
+m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
+
+
+
+CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.svm_classification(
+    source_table text,
+    model_table text,
+    dependent_varname text,
+    independent_varname text,
+    kernel_func text,
+    kernel_params text,
+    grouping_col text)
+  RETURNS void AS $$
+    SELECT MADLIB_SCHEMA.svm_classification($1, $2, $3, $4, $5, $6, $7, NULL);
+$$ LANGUAGE sql VOLATILE
+m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
+
+
+
+CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.svm_classification(
+    source_table text,
+    model_table text,
+    dependent_varname text,
+    independent_varname text,
+    kernel_func text,
+    kernel_params text)
+  RETURNS void AS $$
+    SELECT MADLIB_SCHEMA.svm_classification($1, $2, $3, $4, $5, $6, NULL);
+$$ LANGUAGE sql VOLATILE
+m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
+
+
+CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.svm_classification(
+    source_table text,
+    model_table text,
+    dependent_varname text,
+    independent_varname text,
+    kernel_func text)
+  RETURNS void AS $$
+    SELECT MADLIB_SCHEMA.svm_classification($1, $2, $3, $4, $5, NULL);
+$$ LANGUAGE sql VOLATILE
+m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
+
+
+CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.svm_classification(
+    source_table text,
+    model_table text,
+    dependent_varname text,
+    independent_varname text)
+  RETURNS void AS $$
+    SELECT MADLIB_SCHEMA.svm_classification($1, $2, $3, $4, NULL);
+$$ LANGUAGE sql VOLATILE
+m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
+
