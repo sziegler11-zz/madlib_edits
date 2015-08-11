@@ -62,8 +62,9 @@ SELECT svm_classification(
     NULL, --grouping_col
     'max_iter=10, tolerance=0' --optim_params
     );
--- DROP TABLE IF EXISTS svm_test_predict CASCADE;
--- SELECT svm_predict('lclss', 'svm_test_data', 'id', 'svm_test_predict');
+
+DROP TABLE IF EXISTS svm_test_predict CASCADE;
+SELECT svm_predict('lclss', 'svm_test_data', 'id', 'svm_test_predict');
 
 -- checking correctness with pre-conditioning
 DROP TABLE IF EXISTS svm_normalized CASCADE;
@@ -107,6 +108,7 @@ FROM svm_test_data,
 -- serial
 -- learning
 DROP TABLE IF EXISTS svm_model CASCADE;
+DROP TABLE IF EXISTS svm_model_summary CASCADE;
 SELECT svm_classification(
     'svm_normalized', 
     'svm_model',
@@ -121,10 +123,12 @@ SELECT svm_classification(
     );
 \x on
 SELECT * FROM svm_model;
+SELECT * FROM svm_model_summary;
 \x off
 
 -- l2
 DROP TABLE IF EXISTS svm_model_small_norm2 CASCADE;
+DROP TABLE IF EXISTS svm_model_small_norm2_summary CASCADE;
 SELECT svm_classification(
     'svm_normalized', 
     'svm_model_small_norm2',
@@ -149,6 +153,7 @@ FROM svm_model AS noreg, svm_model_small_norm2 AS l2;
 
 -- l1 makes sprase models
 DROP TABLE IF EXISTS svm_model_very_sparse CASCADE;
+DROP TABLE IF EXISTS svm_model_very_sparse_summary CASCADE;
 SELECT svm_classification(
     'svm_normalized', 
     'svm_model_very_sparse',
@@ -174,21 +179,22 @@ FROM
 WHERE w_i != 0;
 
 -- predicting
--- DROP TABLE IF EXISTS svm_test_predict CASCADE;
--- SELECT svm_predict('svm_model','svm_test_normalized', 'id', 'svm_test_predict');
+DROP TABLE IF EXISTS svm_test_predict CASCADE;
+SELECT svm_predict('svm_model','svm_test_normalized', 'id', 'svm_test_predict');
 
 -- calculating accuracy
 -- the accuracy is not guaranteed to be high because the stepsize & decay_factor
 -- depend on the actual number of segments
--- SELECT
---     count(*) AS misclassification_count
--- FROM svm_test_predict NATURAL JOIN svm_test_normalized
--- WHERE prediction <> label;
+SELECT
+    count(*) AS misclassification_count
+FROM svm_test_predict NATURAL JOIN svm_test_normalized
+WHERE label_prediction <> label;
 
 ----------------------------------------------------------------
 -- decay factor non-zero
 -- learning
 DROP TABLE IF EXISTS svm_model CASCADE;
+DROP TABLE IF EXISTS svm_model_summary CASCADE;
 SELECT svm_classification(
     'svm_normalized', 
     'svm_model',
@@ -204,15 +210,15 @@ SELECT svm_classification(
 SELECT norm_of_gradient FROM svm_model;
 
 -- predicting
--- DROP TABLE IF EXISTS svm_test_predict CASCADE;
--- CREATE TABLE svm_test_predict AS
--- SELECT
---     svm_test_normalized.id,
---     CASE WHEN array_dot(coef, ind) >= 0 THEN 1 ELSE -1 END AS prediction,
---     label
--- FROM svm_test_normalized, svm_model;
+DROP TABLE IF EXISTS svm_test_predict CASCADE;
+CREATE TABLE svm_test_predict AS
+SELECT
+    svm_test_normalized.id,
+    CASE WHEN array_dot(coef, ind) >= 0 THEN 1 ELSE -1 END AS prediction,
+    label
+FROM svm_test_normalized, svm_model;
 
--- -- stats for info
--- SELECT count(*) AS misclassification_count
--- FROM svm_test_predict
--- WHERE prediction <> label;
+-- stats for info
+SELECT count(*) AS misclassification_count
+FROM svm_test_predict
+WHERE prediction <> label;

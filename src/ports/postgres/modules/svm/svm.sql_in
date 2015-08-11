@@ -473,3 +473,33 @@ CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.svm_classification(
 $$ LANGUAGE sql VOLATILE
 m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
 
+
+
+------Prediction
+
+/**
+ * @brief Scores the data points stored in a table using a learned linear support-vector model
+ *
+ * @param input_table Name of table/view containing the data points to be scored
+ * @param data_col Name of column in input_table containing the data points
+ * @param id_col Name of column in input_table containing the integer identifier of data points
+ * @param model_table Name of table where the learned model to be used is stored
+ * @param output_table Name of table to store the results
+ *
+ * @return Textual summary of the algorithm run
+ *
+ * @internal
+ * @sa This function is a wrapper for lsvm.lsvm_predict_batch().
+ */
+CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.svm_predict(
+    model_table text,
+    new_data_table text,
+    id_col_name text,
+    output_table text)
+RETURNS void AS $$
+PythonFunction(svm, svm, svm_predict)
+$$ LANGUAGE plpythonu VOLATILE
+m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA');
+
+
+

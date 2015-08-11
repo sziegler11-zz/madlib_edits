@@ -3,6 +3,7 @@ import plpy
 from utilities.control import IterationController2S
 from utilities.utilities import unique_string
 from utilities.utilities import extract_keyvalue_params
+from utilities.utilities import add_postfix
 from utilities.validate_args import table_exists
 from utilities.validate_args import columns_exist_in_table
 from utilities.validate_args import table_is_empty
@@ -98,6 +99,8 @@ def svm_classification(schema_madlib, source_table, model_table,
     # table names
     input_tbl_valid(source_table, 'SVM')
     output_tbl_valid(model_table, 'SVM')
+    summary_table = add_postfix(model_table, "_summary")
+    output_tbl_valid(summary_table, 'SVM')
 
     args = {'rel_args': unique_string(),
             'rel_state': unique_string(),
@@ -128,20 +131,45 @@ def svm_classification(schema_madlib, source_table, model_table,
             CREATE TABLE {model_table} AS
             SELECT
                 (result).coefficients       AS coef,
-                NULL                        AS __random_feature_data, 
-                NULL                        AS __dep_var_mapping,
                 NULL                        AS grouping_col, 
-                NULL                        AS num_rows_processed,
-                NULL                        AS num_rows_skipped,
                 (result).loss               AS loss,
                 (result).norm_of_gradient   AS norm_of_gradient,
-                {iteration_run}             AS num_iterations
+                {iteration_run}             AS num_iterations,
+                NULL                        AS num_rows_processed,
+                NULL                        AS num_rows_skipped,
+                NULL                        AS __random_feature_data, 
+                NULL                        AS __dep_var_mapping
             FROM (
                 SELECT {schema_madlib}.internal_linear_svm_igd_result(
                     _state) AS result
                 FROM {rel_state}
                 WHERE _iteration = {iteration_run}) subq
             """.format(iteration_run=iteration_run, **args))
+
+    plpy.execute("""
+            CREATE TABLE {summary_table} AS
+            SELECT
+                'svm'::text                         AS method,
+                '__MADLIB_VERSION__'::text          AS version_number, 
+                '{source_table}'::text              AS source_table,
+                '{model_table}'::text               AS model_table, 
+                '{dependent_varname}'::text         AS dependent_varname,
+                '{independent_varname}'::text       AS independent_varname,
+                'linear'::text                      AS kernel_func,
+                NULL::text                          AS kernel_params,
+                NULL::text                          AS grouping_col,
+                'init_stepsize={init_stepsize}, ' ||
+                'decay_factor={decay_factor}, ' ||
+                'max_iter={max_iter}, ' ||
+                'tolerance={tolerance}'::text       AS optim_params,
+                'lambda={lambda}, ' ||
+                'norm={norm}, ' ||
+                'n_folds={n_folds}'::text           AS reg_params,
+                NULL::integer                       AS num_all_groups,
+                NULL::integer                       AS num_failed_groups,
+                NULL::bigint                        AS total_rows_processed,
+                NULL::bigint                        AS total_rows_skipped
+            """.format(**args))
 
     plpy.execute("set client_min_messages to " + old_msg_level)
 
@@ -151,41 +179,49 @@ def svm_classification(schema_madlib, source_table, model_table,
 # ------------------------------------------------------------------------------
 # Function to predict the labels of points in a table using a linear classifier
 # ------------------------------------------------------------------------------
-# def svm_predict_batch(schema_madlib, source_table, data_col, id_col,
-#         model_table, output_table, parallel, **kwargs):
-#     """
-#     Scores the data points stored in a table using a learned support vector model.
+def svm_predict(schema_madlib, model_table, new_data_table, id_col_name,
+         output_table, **kwargs):
+    """
+    Scores the data points stored in a table using a learned support vector model.
 
-#     @param source_table Name of table/view containing the data points to be scored
-#     @param data_col Name of column in source_table containing the data points
-#     @param id_col Name of column in source_table containing (integer) identifier for data point
-#     @param model_table Name of learned model
-#     @param output_table Name of table to store the results
-#     @param parallel Deprecated and ignored boolean flag. (Default: None)
-#     """
-#     # parameter validation
-#     input_tbl_valid(source_table, 'SVM')
-#     cols_in_tbl_valid(source_table, [data_col, id_col], 'SVM')
-#     input_tbl_valid(model_table, 'SVM')
-#     cols_in_tbl_valid(model_table, ['weights'], 'SVM')
-#     output_tbl_valid(output_table, 'SVM')
+    @param model_table Name of learned model
+    @param new_data_table Name of table/view containing the data points to be scored
+    @param id_col_name Name of column in source_table containing (integer) identifier for data point
+    @param output_table Name of table to store the results
+    """
+    # parameter validation
+    input_tbl_valid(model_table, 'SVM')
+    cols_in_tbl_valid(model_table, ['coef'], 'SVM')
+    input_tbl_valid(new_data_table, 'SVM')
+    summary_table = add_postfix(model_table, "_summary")
+    input_tbl_valid(summary_table, 'SVM')
+    output_tbl_valid(output_table, 'SVM')
 
-#     # use lsvm_predict internally
-#     plpy.execute("""
-#         CREATE TABLE {output_table} AS
-#         SELECT
-#             {id_col} AS id,
-#             {schema_madlib}.lsvm_predict(
-#                 (SELECT weights FROM {model_table}),
-#                 {data_col}) AS prediction
-#         FROM {source_table}
-#         """.format(**locals()))
+    summary = plpy.execute("""
+            SELECT
+                dependent_varname,
+                independent_varname,
+                kernel_func,
+                kernel_params,
+                grouping_col
+            FROM {summary_table}
+            """.format(**locals()))[0]
+    dependent_varname = summary['dependent_varname']
+    independent_varname = summary['independent_varname']
+    kernel_func = summary['kernel_func']
+    kernel_params = summary['kernel_params']
+    grouping_col = summary['grouping_col']
+    prediction = add_postfix(dependent_varname, '_prediction')
 
-#     return """
-#         Finished processing data points in %s table.
-#         Results are stored in %s table.
-#         """ % (source_table,output_table)
-
+    plpy.execute("""
+        CREATE TABLE {output_table} AS
+        SELECT
+            {id_col_name} AS id,
+            CASE WHEN array_dot(coef, {independent_varname}) >= 0
+                THEN 1 ELSE -1
+            END AS {prediction}
+        FROM {model_table}, {new_data_table}
+        """.format(**locals()))
 
 
 def __extract_optim_params(schema_madlib, optim_params, module='SVM'):
