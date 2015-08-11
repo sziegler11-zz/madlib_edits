@@ -93,15 +93,15 @@ svm_classification(
     previous iteration of less than the tolerance, the algorithm will halt.</DD>
 
   <DT>reg_params (optional)</DT>
-  <DD>TEXT, default: 'lambda=0.01, norm=L2, n_folds=0, possible_set_of_lambda_values=[]'. <br>
-    Regularization parameters. Parameter 'norm' corresponds which norm will be
-    used for regularization; user can select either 'L1' or 'L2'.
-    If the user specifies n_folds >0, then cross-validation will be performed
-    to select lambda from the set possible_set_of_lambda_values.
+  <DD>TEXT, default: 'lambda=0.01, norm=L2, n_folds=0'. <br>
+    Regularization parameters. Parameter 'norm' corresponds
+    which norm will be used for regularization; user can select either 'L1' or 'L2'.
+    If the user specifies n_folds > 1, then cross-validation will be performed to
+    select lambda from a list.
 
-    For example, if one wanted to regularize with the L1 norm and use a lamdba
-    value from the set [0.3, 0.4, 0.5], one would use 'norm=L1, n_folds=10,
-    possible_set_of_lambda_values=[0.3, 0.4, 0.5]' as reg_params.</DD>
+    For example, if one wanted to regularize with the L1 norm and use a lambda
+    value from the set {0.3, 0.4, 0.5}, one would input
+    'lambda={0.3, 0.4, 0.5}, norm=L1, n_folds=10' as reg_params.</DD>
 
   <DT>verbose (optional)</DT>
   <DD>BOOLEAN default: FALSE.
