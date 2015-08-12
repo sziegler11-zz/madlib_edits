@@ -109,7 +109,8 @@ def svm_classification(schema_madlib, source_table, model_table,
             'col_dep_var': dependent_varname} # hard-coded name
 
     # arguments for iterating
-    n_features = plpy.execute("SELECT array_upper(ind, 1) AS dim FROM " + \
+    n_features = plpy.execute("SELECT array_upper(" \
+            + independent_varname + ", 1) AS dim FROM " + \
             source_table + " LIMIT 1")[0]['dim']
     n_tuples = plpy.execute("SELECT count(*) AS c FROM " + source_table)[0]['c']
     args.update(locals())
@@ -217,7 +218,7 @@ def svm_predict(schema_madlib, model_table, new_data_table, id_col_name,
         CREATE TABLE {output_table} AS
         SELECT
             {id_col_name} AS id,
-            CASE WHEN array_dot(coef, {independent_varname}) >= 0
+            CASE WHEN {schema_madlib}.array_dot(coef, {independent_varname}) >= 0
                 THEN 1 ELSE -1
             END AS {prediction}
         FROM {model_table}, {new_data_table}
