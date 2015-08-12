@@ -529,6 +529,8 @@ def is_var_valid(tbl, var):
     Test whether the variable(s) is valid by actually selecting it from
     the table
     """
+    if var is None or var.lower().strip() == '':
+        return False
     try:
         plpy.execute(
             """

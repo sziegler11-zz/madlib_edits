@@ -4,12 +4,14 @@ from utilities.control import IterationController2S
 from utilities.utilities import unique_string
 from utilities.utilities import extract_keyvalue_params
 from utilities.utilities import add_postfix
+from utilities.utilities import _assert
 from utilities.validate_args import table_exists
 from utilities.validate_args import columns_exist_in_table
 from utilities.validate_args import table_is_empty
 from utilities.validate_args import cols_in_tbl_valid
 from utilities.validate_args import input_tbl_valid
 from utilities.validate_args import output_tbl_valid
+from utilities.validate_args import is_var_valid
 
 
 def __svm_train(schema_madlib, rel_args, rel_state, rel_source,
@@ -97,7 +99,15 @@ def svm_classification(schema_madlib, source_table, model_table,
         plpy.execute("set client_min_messages to error")
 
     # table names
+    # input
     input_tbl_valid(source_table, 'SVM')
+    _assert(is_var_valid(source_table, dependent_varname),
+            "SVM error: invalid dependent_varname ('" + str(dependent_varname) + \
+            "') for source_table (" + source_table + ")!")
+    _assert(is_var_valid(source_table, independent_varname),
+            "SVM error: invalid independent_varname ('" + str(independent_varname) + \
+            "') for source_table (" + source_table + ")!")
+    # output
     output_tbl_valid(model_table, 'SVM')
     summary_table = add_postfix(model_table, "_summary")
     output_tbl_valid(summary_table, 'SVM')
@@ -116,7 +126,18 @@ def svm_classification(schema_madlib, source_table, model_table,
     args.update(locals())
 
     # other params
-    kernel_func = 'linear' if kernel_func is None else kernel_func
+    kernel_func = 'linear' if kernel_func is None else kernel_func.lower()
+    if kernel_func not in ('linear', 'polynomial', 'gaussian'):
+        plpy.error("SVM error: invalid kernel_func ('" + kernel_func + "')!")
+    if kernel_func != 'linear':
+        plpy.error("SVM error: only linear kernel is supported!")
+    if kernel_params is not None and kernel_params.lower().strip() != '':
+        plpy.error("SVM error: linear kernel accepts only null parameters!")
+    if grouping_col is not None and grouping_col.lower().strip() != '':
+        plpy.error("SVM error: grouping not yet supported! grouping_col must be null")
+
+
+
     optim_params_dict = __extract_optim_params(schema_madlib, optim_params)
     reg_params_dict = __extract_reg_params(schema_madlib, reg_params)
     args.update(optim_params_dict)
@@ -132,7 +153,7 @@ def svm_classification(schema_madlib, source_table, model_table,
             CREATE TABLE {model_table} AS
             SELECT
                 (result).coefficients       AS coef,
-                NULL                        AS grouping_col, 
+                NULL                        AS grouping_key, 
                 (result).loss               AS loss,
                 (result).norm_of_gradient   AS norm_of_gradient,
                 {iteration_run}             AS num_iterations,
@@ -147,6 +168,10 @@ def svm_classification(schema_madlib, source_table, model_table,
                 WHERE _iteration = {iteration_run}) subq
             """.format(iteration_run=iteration_run, **args))
 
+    if type(args['lambda']) is list:
+        args['lambda_str'] = '{' + ','.join(str(e) for e in args['lambda']) + '}'
+    else:
+        args['lambda_str'] = str(args['lambda'])
     plpy.execute("""
             CREATE TABLE {summary_table} AS
             SELECT
@@ -163,7 +188,7 @@ def svm_classification(schema_madlib, source_table, model_table,
                 'decay_factor={decay_factor}, ' ||
                 'max_iter={max_iter}, ' ||
                 'tolerance={tolerance}'::text       AS optim_params,
-                'lambda={lambda}, ' ||
+                'lambda={lambda_str}, ' ||
                 'norm={norm}, ' ||
                 'n_folds={n_folds}'::text           AS reg_params,
                 NULL::integer                       AS num_all_groups,
@@ -173,8 +198,6 @@ def svm_classification(schema_madlib, source_table, model_table,
             """.format(**args))
 
     plpy.execute("set client_min_messages to " + old_msg_level)
-
-
 
 
 # ------------------------------------------------------------------------------
@@ -190,14 +213,21 @@ def svm_predict(schema_madlib, model_table, new_data_table, id_col_name,
     @param id_col_name Name of column in source_table containing (integer) identifier for data point
     @param output_table Name of table to store the results
     """
-    # parameter validation
+    # model table
     input_tbl_valid(model_table, 'SVM')
     cols_in_tbl_valid(model_table, ['coef'], 'SVM')
-    input_tbl_valid(new_data_table, 'SVM')
+    # summary table
     summary_table = add_postfix(model_table, "_summary")
     input_tbl_valid(summary_table, 'SVM')
-    output_tbl_valid(output_table, 'SVM')
+    cols_in_tbl_valid(summary_table,
+            ['dependent_varname',
+             'independent_varname',
+             'kernel_func',
+             'kernel_params',
+             'grouping_col'],
+            'SVM')
 
+    # read necessary info from summary
     summary = plpy.execute("""
             SELECT
                 dependent_varname,
@@ -213,6 +243,20 @@ def svm_predict(schema_madlib, model_table, new_data_table, id_col_name,
     kernel_params = summary['kernel_params']
     grouping_col = summary['grouping_col']
     prediction = add_postfix(dependent_varname, '_prediction')
+
+    input_tbl_valid(new_data_table, 'SVM')
+    _assert(is_var_valid(new_data_table, dependent_varname),
+            "SVM error: dependent_varname ('" + dependent_varname + \
+            "') is invalid for new_data_table (" + new_data_table + ")!")
+    _assert(is_var_valid(new_data_table, independent_varname),
+            "SVM error: independent_varname ('" + independent_varname + \
+            "') is invalid for new_data_table (" + new_data_table + ")!")
+    if id_col_name is None:
+        plpy.error("SVM error: id_col_name is NULL!")
+    _assert(is_var_valid(new_data_table, id_col_name),
+            "SVM error: id_col_name ('" + id_col_name + \
+            "') is invalid for new_data_table (" + new_data_table + ")!")
+    output_tbl_valid(output_table, 'SVM')
 
     plpy.execute("""
         CREATE TABLE {output_table} AS
