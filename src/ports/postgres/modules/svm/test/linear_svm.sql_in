@@ -246,7 +246,7 @@ SELECT svm_classification(
     NULL, -- kernel_pararms
     NULL, --grouping_col
     'init_stepsize=0.03, decay_factor=0.9, max_iter=5, tolerance=0',
-    'lambda=0.001',
+    'lambda={0.001}',
     true -- verbose
     );
 SELECT norm_of_gradient FROM svm_model;

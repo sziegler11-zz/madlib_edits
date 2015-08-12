@@ -297,7 +297,7 @@ def __extract_reg_params(schema_madlib, reg_params, module='SVM'):
                                                   reg_params_types_lambda_scalar,
                                                   default_dict)
         is_lambda_list = False
-    except TypeError:
+    except ValueError:
         reg_params_dict = extract_keyvalue_params(reg_params,
                                                   reg_params_types_lambda_list,
                                                   default_dict)

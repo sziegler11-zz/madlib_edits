@@ -70,8 +70,8 @@ svm_classification(
 
   <DT>kernel_params (optional)</DT>
   <DD>TEXT, defaults: NULL for kernel='linear';
-                      'gamma'=\f$\frac{1}{num\_features}\f$ for kernel='gaussian',
-                      q=0,d=3 for kernel='polynomial'.
+                      'gamma=\f$\frac{1}{num\_features}\f$'' for kernel='gaussian',
+                      'q=0,d=3' for kernel='polynomial'.
    <br>Parameters for non-linear kernel in a comma-separated string of key-value pairs.
    <br>For kernel='gaussian', one parameter, 'gamma', is expected.
    <br>For kernel='polynomial', two parameters are expected:
@@ -85,7 +85,7 @@ svm_classification(
     grouping is used and a single model is generated.</DD>
 
   <DT>optim_params (optional)</DT>
-  <DD>TEXT, default: 'init_stepsize=0.01, decay_factor=0.9, max_iters=100, tolerance=0.001'. <br>
+  <DD>TEXT, default: 'init_stepsize=0.01, decay_factor=0.9, max_iter=100, tolerance=0.001'. <br>
     Optimization paramters including stepsize, decay factor of stepsize, max
     number of iterations, and error tolerance. If the number of iterations of
     IGD reaches the maximum, the algorithm will halt. Alternatively, if the
@@ -117,8 +117,8 @@ svm_classification(
         <td>FLOAT8. Vector of the coefficients.</td>
       </tr>
       <tr>
-        <th>grouping_col</th>
-        <td>TEXT Name of grouping columns.</td>
+        <th>grouping_key</th>
+        <td>TEXT Identifies the group to which that row belongs.</td>
       </tr>
       <tr>
         <th>num_rows_processed</th>
