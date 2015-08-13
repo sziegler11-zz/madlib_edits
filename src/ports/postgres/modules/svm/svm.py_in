@@ -5,6 +5,7 @@ from utilities.utilities import unique_string
 from utilities.utilities import extract_keyvalue_params
 from utilities.utilities import add_postfix
 from utilities.utilities import _assert
+
 from utilities.validate_args import table_exists
 from utilities.validate_args import columns_exist_in_table
 from utilities.validate_args import table_is_empty
@@ -12,6 +13,7 @@ from utilities.validate_args import cols_in_tbl_valid
 from utilities.validate_args import input_tbl_valid
 from utilities.validate_args import output_tbl_valid
 from utilities.validate_args import is_var_valid
+from utilities.validate_args import get_expr_type
 
 
 def __svm_train(schema_madlib, rel_args, rel_state, rel_source,
@@ -51,8 +53,10 @@ def __svm_train(schema_madlib, rel_args, rel_state, rel_source,
                 SELECT
                     {schema_madlib}.{agg}(
                         (_src.{col_ind_var})::FLOAT8[],
-                        CASE WHEN (_src.{col_dep_var}) < 0 THEN false
-                        ELSE true END,
+                        CASE WHEN (_src.{col_dep_var}) IS NULL THEN NULL
+                            WHEN (_src.{col_dep_var}) = {mapped_value_for_negative} THEN TRUE
+                            ELSE FALSE
+                        END,
                         m4_ifdef(`__HAWQ__', `
                         ({{__state__}})
                         ', `
@@ -107,6 +111,21 @@ def svm_classification(schema_madlib, source_table, model_table,
     _assert(is_var_valid(source_table, independent_varname),
             "SVM error: invalid independent_varname ('" + str(independent_varname) + \
             "') for source_table (" + source_table + ")!")
+
+    #dependent variable mapping
+    dep_labels=plpy.execute("""
+        SELECT {dependent_varname} AS y 
+        FROM {source_table} 
+        WHERE {dependent_varname} IS NOT NULL 
+        GROUP BY {dependent_varname}""".format(**locals()))
+    __dep_var_mapping = ["'" + d['y'] + "'" if isinstance(d['y'], basestring)
+                         else str(d['y']) for d in dep_labels]
+    if len(__dep_var_mapping) != 2:
+        plpy.error("SVM error: must have exactly two dependent variable values for classification!")
+    dep_type = get_expr_type(dependent_varname, source_table)
+    if '[]' in dep_type:
+        plpy.error("SVM error: dependent_varname cannot be of array type!")
+
     # output
     output_tbl_valid(model_table, 'SVM')
     summary_table = add_postfix(model_table, "_summary")
@@ -116,7 +135,8 @@ def svm_classification(schema_madlib, source_table, model_table,
             'rel_state': unique_string(),
             'rel_source': source_table,
             'col_ind_var': independent_varname,
-            'col_dep_var': dependent_varname} # hard-coded name
+            'col_dep_var': dependent_varname,
+            'mapped_value_for_negative': __dep_var_mapping[0]}
 
     # arguments for iterating
     n_features = plpy.execute("SELECT array_upper(" \
@@ -136,8 +156,6 @@ def svm_classification(schema_madlib, source_table, model_table,
     if grouping_col is not None and grouping_col.lower().strip() != '':
         plpy.error("SVM error: grouping not yet supported! grouping_col must be null")
 
-
-
     optim_params_dict = __extract_optim_params(schema_madlib, optim_params)
     reg_params_dict = __extract_reg_params(schema_madlib, reg_params)
     args.update(optim_params_dict)
@@ -149,18 +167,20 @@ def svm_classification(schema_madlib, source_table, model_table,
     iteration_run = __svm_train(**args)
 
     # organizing results
+    args['mapping'] = __dep_var_mapping[0] + "," + __dep_var_mapping[1]
     plpy.execute("""
             CREATE TABLE {model_table} AS
             SELECT
-                (result).coefficients       AS coef,
-                NULL                        AS grouping_key, 
-                (result).loss               AS loss,
-                (result).norm_of_gradient   AS norm_of_gradient,
-                {iteration_run}             AS num_iterations,
-                NULL                        AS num_rows_processed,
-                NULL                        AS num_rows_skipped,
-                NULL                        AS __random_feature_data, 
-                NULL                        AS __dep_var_mapping
+                (result).coefficients           AS coef,
+                NULL                            AS grouping_key, 
+                (result).loss                   AS loss,
+                (result).norm_of_gradient       AS norm_of_gradient,
+                {iteration_run}                 AS num_iterations,
+                (result).num_rows_processed     AS num_rows_processed,
+                {n_tuples} - (result).num_rows_processed
+                                                AS num_rows_skipped,
+                NULL                            AS __random_feature_data, 
+                ARRAY[{mapping}]::{dep_type}[]  AS __dep_var_mapping
             FROM (
                 SELECT {schema_madlib}.internal_linear_svm_igd_result(
                     _state) AS result
@@ -191,10 +211,11 @@ def svm_classification(schema_madlib, source_table, model_table,
                 'lambda={lambda_str}, ' ||
                 'norm={norm}, ' ||
                 'n_folds={n_folds}'::text           AS reg_params,
-                NULL::integer                       AS num_all_groups,
-                NULL::integer                       AS num_failed_groups,
-                NULL::bigint                        AS total_rows_processed,
-                NULL::bigint                        AS total_rows_skipped
+                1::integer                          AS num_all_groups,
+                0::integer                          AS num_failed_groups,
+                num_rows_processed::bigint          AS total_rows_processed,
+                num_rows_skipped::bigint            AS total_rows_skipped
+            FROM {model_table};
             """.format(**args))
 
     plpy.execute("set client_min_messages to " + old_msg_level)
@@ -263,9 +284,11 @@ def svm_predict(schema_madlib, model_table, new_data_table, id_col_name,
         SELECT
             {id_col_name} AS id,
             CASE WHEN {schema_madlib}.array_dot(coef, {independent_varname}) >= 0
-                THEN 1 ELSE -1
+                THEN __dep_var_mapping[2]
+                ELSE __dep_var_mapping[1]
             END AS {prediction}
         FROM {model_table}, {new_data_table}
+        WHERE not {schema_madlib}.array_contains_null({independent_varname})
         """.format(**locals()))
 
 

@@ -181,7 +181,8 @@ internal_linear_svm_igd_result::run(AnyType &args) {
     AnyType tuple;
     tuple << state.task.model
         << static_cast<double>(state.algo.loss)
-        << state.algo.gradient.norm();
+        << state.algo.gradient.norm()
+        << static_cast<int64_t>(state.algo.numRows);
 
     return tuple;
 }
